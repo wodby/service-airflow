@@ -1,0 +1,272 @@
+name: airflow
+title: Apache Airflow
+icon: airflow
+type: service
+scalable: false
+
+labels:
+- airflow
+- workflow
+- orchestration
+
+options:
+- version: '3.3'
+  tag: '3.3.1'
+  default: true
+
+endpoints:
+- name: airflow
+  ports:
+  - name: http
+    number: 8080
+    protocol: http
+    main: true
+
+tokens:
+- name: admin_username
+  value: admin
+- name: admin_password
+  generate:
+    regex: '[A-Za-z0-9!@#%_-]{32}'
+- name: fernet_key
+  generate:
+    regex: '[A-Za-z0-9_-]{43}='
+- name: api_secret_key
+  generate:
+    regex: '[A-Za-z0-9_-]{64}'
+- name: api_auth_jwt_secret
+  generate:
+    regex: '[A-Za-z0-9_-]{64}'
+
+env:
+- name: AIRFLOW__CORE__EXECUTOR
+  value: LocalExecutor
+- name: AIRFLOW__CORE__LOAD_EXAMPLES
+  value: 'False'
+- name: AIRFLOW__CORE__AUTH_MANAGER
+  value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+- name: AIRFLOW__CORE__FERNET_KEY
+  value: '{{fernet_key}}'
+  secret: true
+- name: AIRFLOW__API__SECRET_KEY
+  value: '{{api_secret_key}}'
+  secret: true
+- name: AIRFLOW__API_AUTH__JWT_SECRET
+  value: '{{api_auth_jwt_secret}}'
+  secret: true
+- name: _AIRFLOW_WWW_USER_USERNAME
+  value: '{{admin_username}}'
+  secret: true
+- name: _AIRFLOW_WWW_USER_PASSWORD
+  value: '{{admin_password}}'
+  secret: true
+
+links:
+- name: postgres
+  title: PostgreSQL
+  required: true
+  env:
+  - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+    value: postgresql+psycopg2://{{link.database.user.name}}:{{link.database.user.password}}@{{link.database.host}}:{{link.database.port}}/{{link.database.db.name}}
+    secret: true
+  selectors:
+  - type: db
+    labels:
+    - postgres
+
+volumes:
+- name: data
+  title: Airflow data, DAGs, and logs
+  size: 10
+  helm:
+    labels: persistence.labels
+    values:
+    - name: persistence.enabled
+      value: true
+    - name: persistence.existingClaim
+      value: '{{volumes.data.claim}}'
+    - name: persistence.size
+      value: '{{volumes.data.size}}Gi'
+
+helm:
+  name: wodby
+  source: oci://registry-1.docker.io/wodby/stateful
+  chart: oci://registry-1.docker.io/wodby/stateful
+  version: 0.2.0
+  valueMappings:
+    replicas: replicaCount
+    nameOverride: nameOverride
+    fullnameOverride: fullnameOverride
+    serviceAccountName: serviceAccount.name
+    serviceAccountCreate: serviceAccount.create
+    strategy: updateStrategy.type
+    minReady: minReadySeconds
+    shutdownGracePeriod: terminationGracePeriodSeconds
+  values:
+  - name: containerName
+    value: airflow-api-server
+  - name: args
+    value:
+    - api-server
+  - name: containerPorts
+    value:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+  - name: headlessService.enabled
+    value: false
+  - name: persistence.mountPath
+    value: /opt/airflow
+  - name: podSecurityContext
+    value:
+      fsGroup: 0
+      fsGroupChangePolicy: OnRootMismatch
+  - name: securityContext
+    value:
+      allowPrivilegeEscalation: false
+      runAsUser: 50000
+      runAsGroup: 0
+  - name: initContainers
+    value:
+    - name: airflow-init
+      image: apache/airflow:3.3.1
+      imagePullPolicy: IfNotPresent
+      args:
+      - version
+      env:
+      - name: AIRFLOW__CORE__EXECUTOR
+        value: LocalExecutor
+      - name: AIRFLOW__CORE__LOAD_EXAMPLES
+        value: 'False'
+      - name: AIRFLOW__CORE__AUTH_MANAGER
+        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      - name: _AIRFLOW_DB_MIGRATE
+        value: 'true'
+      - name: _AIRFLOW_WWW_USER_CREATE
+        value: 'true'
+      envFrom:
+      - secretRef:
+          name: '{{service.secrets.env}}'
+      volumeMounts:
+      - name: data
+        mountPath: /opt/airflow
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+  - name: extraContainers
+    value:
+    - name: scheduler
+      image: apache/airflow:3.3.1
+      imagePullPolicy: IfNotPresent
+      args:
+      - scheduler
+      env:
+      - name: AIRFLOW__CORE__EXECUTOR
+        value: LocalExecutor
+      - name: AIRFLOW__CORE__LOAD_EXAMPLES
+        value: 'False'
+      - name: AIRFLOW__CORE__AUTH_MANAGER
+        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      envFrom:
+      - secretRef:
+          name: '{{service.secrets.env}}'
+      volumeMounts:
+      - name: data
+        mountPath: /opt/airflow
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          memory: 2Gi
+    - name: dag-processor
+      image: apache/airflow:3.3.1
+      imagePullPolicy: IfNotPresent
+      args:
+      - dag-processor
+      env:
+      - name: AIRFLOW__CORE__EXECUTOR
+        value: LocalExecutor
+      - name: AIRFLOW__CORE__LOAD_EXAMPLES
+        value: 'False'
+      - name: AIRFLOW__CORE__AUTH_MANAGER
+        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      envFrom:
+      - secretRef:
+          name: '{{service.secrets.env}}'
+      volumeMounts:
+      - name: data
+        mountPath: /opt/airflow
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+    - name: triggerer
+      image: apache/airflow:3.3.1
+      imagePullPolicy: IfNotPresent
+      args:
+      - triggerer
+      env:
+      - name: AIRFLOW__CORE__EXECUTOR
+        value: LocalExecutor
+      - name: AIRFLOW__CORE__LOAD_EXAMPLES
+        value: 'False'
+      - name: AIRFLOW__CORE__AUTH_MANAGER
+        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      envFrom:
+      - secretRef:
+          name: '{{service.secrets.env}}'
+      volumeMounts:
+      - name: data
+        mountPath: /opt/airflow
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+  - name: startupProbe
+    value:
+      httpGet:
+        path: /api/v2/monitor/health
+        port: http
+      failureThreshold: 60
+      periodSeconds: 5
+  - name: readinessProbe
+    value:
+      httpGet:
+        path: /api/v2/monitor/health
+        port: http
+      periodSeconds: 10
+  - name: livenessProbe
+    value:
+      httpGet:
+        path: /api/v2/monitor/health
+        port: http
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+workloads:
+- name: main
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: '{{helm.release}}'
+  kind: statefulset
+  primary: true
+  helm:
+    labels: podLabels
+    annotations: podAnnotations
+    volumes: extraVolumes
+    sidecars: extraContainers
+  containers:
+  - name: airflow-api-server
+    image: apache/airflow
+    helm:
+      resources: resources
+      env: envVars
+      mounts: extraVolumeMounts
