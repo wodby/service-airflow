@@ -11,7 +11,7 @@ labels:
 
 options:
 - version: '3.3'
-  tag: '3.3.1'
+  tag: '3.3.2'
   default: true
 
 endpoints:
@@ -67,7 +67,8 @@ links:
   required: true
   env:
   - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-    value: postgresql+psycopg2://{{link.database.user.name}}:{{link.database.user.password}}@{{link.database.host}}:{{link.database.port}}/{{link.database.db.name}}
+    value: 
+      postgresql+psycopg2://{{link.database.user.name}}:{{link.database.user.password}}@{{link.database.host}}:{{link.database.port}}/{{link.database.db.name}}
     secret: true
   selectors:
   - type: db
@@ -139,7 +140,8 @@ helm:
       - name: AIRFLOW__CORE__LOAD_EXAMPLES
         value: 'False'
       - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+        value: 
+          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       - name: _AIRFLOW_DB_MIGRATE
         value: 'true'
       - name: _AIRFLOW_WWW_USER_CREATE
@@ -169,7 +171,8 @@ helm:
       - name: AIRFLOW__CORE__LOAD_EXAMPLES
         value: 'False'
       - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+        value: 
+          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       envFrom:
       - secretRef:
           name: '{{service.secrets.env}}'
@@ -193,7 +196,8 @@ helm:
       - name: AIRFLOW__CORE__LOAD_EXAMPLES
         value: 'False'
       - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+        value: 
+          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       envFrom:
       - secretRef:
           name: '{{service.secrets.env}}'
@@ -217,7 +221,8 @@ helm:
       - name: AIRFLOW__CORE__LOAD_EXAMPLES
         value: 'False'
       - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+        value: 
+          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       envFrom:
       - secretRef:
           name: '{{service.secrets.env}}'
