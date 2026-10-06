@@ -1,5 +1,6 @@
 name: airflow
 title: Apache Airflow
+guidance: GUIDANCE.md
 icon: airflow
 type: service
 scalable: false
