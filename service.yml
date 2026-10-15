@@ -131,7 +131,7 @@ helm:
   - name: initContainers
     value:
     - name: airflow-init
-      image: apache/airflow:3.3.1
+      image: apache/airflow:3.3.2
       imagePullPolicy: IfNotPresent
       args:
       - version
@@ -162,7 +162,7 @@ helm:
   - name: extraContainers
     value:
     - name: scheduler
-      image: apache/airflow:3.3.1
+      image: apache/airflow:3.3.2
       imagePullPolicy: IfNotPresent
       args:
       - scheduler
@@ -187,7 +187,7 @@ helm:
         limits:
           memory: 2Gi
     - name: dag-processor
-      image: apache/airflow:3.3.1
+      image: apache/airflow:3.3.2
       imagePullPolicy: IfNotPresent
       args:
       - dag-processor
@@ -212,7 +212,7 @@ helm:
         limits:
           memory: 1Gi
     - name: triggerer
-      image: apache/airflow:3.3.1
+      image: apache/airflow:3.3.2
       imagePullPolicy: IfNotPresent
       args:
       - triggerer
