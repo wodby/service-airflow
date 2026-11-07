@@ -272,6 +272,10 @@ workloads:
   containers:
   - name: airflow-api-server
     image: apache/airflow
+    resources:
+      request:
+        cpu: 50
+        memory: 96
     helm:
       resources: resources
       env: envVars
