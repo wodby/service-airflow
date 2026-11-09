@@ -15,6 +15,7 @@ options:
   tag: '3.3.2'
   default: true
 
+  eol: '2026-11-07T00:00:00+00:00'
 endpoints:
 - name: airflow
   ports:
