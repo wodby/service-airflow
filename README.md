@@ -11,7 +11,8 @@ configuration for Apache Airflow.
 
 ## Wodby stacks using this service
 
-- [Apache Airflow application stack](https://github.com/wodby/stack-airflow)
+- [Apache Airflow application stack](https://github.com/wodby/stack-airflow), through the
+  [buildable Airflow service](https://github.com/wodby/service-airflow-buildable) that builds on this one
 
 ## Service overview
 
@@ -30,8 +31,9 @@ configuration for Apache Airflow.
 
 ## Use this service
 
-Use this service through [Apache Airflow application stack](https://github.com/wodby/stack-airflow), or reference `airflow` from a
-custom Wodby stack.
+The [Apache Airflow application stack](https://github.com/wodby/stack-airflow) uses the
+[buildable Airflow service](https://github.com/wodby/service-airflow-buildable), which builds on this one. Reference
+`airflow` from a custom Wodby stack to run Airflow without a build.
 
 A service is a reusable component and does not deploy by itself. The stack
 defines its links, settings, versions, resources, and relationship to the rest
