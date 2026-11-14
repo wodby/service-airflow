@@ -16,6 +16,19 @@ options:
   default: true
 
   eol: '2026-11-07T00:00:00+00:00'
+
+# Airflow is built from the app repository on the apache/airflow image of the
+# option's version: the build adds the repository's DAGs, plugins and Python
+# packages.
+build:
+  connect: true
+  dockerfile: Dockerfile
+  boilerplates:
+  - name: vanilla
+    title: Vanilla Airflow project
+    repo: https://github.com/wodby/airflow-boilerplate
+    branch: main
+
 endpoints:
 - name: airflow
   ports:
@@ -79,7 +92,7 @@ links:
 
 volumes:
 - name: data
-  title: Airflow data, DAGs, and logs
+  title: Airflow data and logs
   size: 10
   helm:
     labels: persistence.labels
@@ -273,6 +286,7 @@ workloads:
   containers:
   - name: airflow-api-server
     image: apache/airflow
+    build: true
     resources:
       request:
         cpu: 50
@@ -281,3 +295,12 @@ workloads:
       resources: resources
       env: envVars
       mounts: extraVolumeMounts
+      image:
+        # The setup step, scheduler, DAG processor and triggerer run the built
+        # image too, so every Airflow component has the project's DAGs and
+        # packages.
+        references:
+        - initContainers[0].image
+        - extraContainers[0].image
+        - extraContainers[1].image
+        - extraContainers[2].image

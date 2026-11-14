@@ -1,6 +1,6 @@
 # Apache Airflow on Wodby
 
-What Wodby sets up for Airflow on this service. It runs from the official `apache/airflow` image. Configuration is passed as `AIRFLOW__<SECTION>__<KEY>` environment variables, which take precedence over `airflow.cfg`.
+What Wodby sets up for Airflow on this service. It runs the official `apache/airflow` image built with the app's repository. Configuration is passed as `AIRFLOW__<SECTION>__<KEY>` environment variables, which take precedence over `airflow.cfg`.
 
 ## Processes
 
@@ -25,9 +25,17 @@ It is the metadata database of Airflow. Do not set the connection elsewhere.
 
 Users are managed by the FAB auth manager (`AIRFLOW__CORE__AUTH_MANAGER`). Example DAGs are off (`AIRFLOW__CORE__LOAD_EXAMPLES`).
 
-## Data and DAGs
+## Image and DAGs
 
-The `data` volume is mounted at `/opt/airflow`, the Airflow home, in every container. DAG files go to `/opt/airflow/dags` and plugins to `/opt/airflow/plugins`. The service has no build: DAGs are files on the volume, not part of an image.
+The image is built from the app's Git repository on top of the `apache/airflow` image of the service's version, so the service's versions are Airflow versions. Start the repository from the [Airflow boilerplate](https://github.com/wodby/airflow-boilerplate). The build:
+
+- copies the repository to `/opt/airflow-app`, outside the `/opt/airflow` data volume, which would hide files baked into the image;
+- installs the packages in `requirements.txt`, when the repository has one, with Airflow pinned to the image's version, so packages that need another Airflow fail the build;
+- sets `AIRFLOW__CORE__DAGS_FOLDER` to `/opt/airflow-app/dags` and `AIRFLOW__CORE__PLUGINS_FOLDER` to `/opt/airflow-app/plugins`.
+
+Every Airflow component runs the built image: the API server, and the setup step, scheduler, DAG processor and triggerer, which the service's `helm.image.references` point at the same image. DAG and package changes reach Airflow with the next deployment. Airflow's version comes from the service version and the image, not from the repository.
+
+Put DAG files in `dags/` and plugins in `plugins/` of the repository; the `dags` and `plugins` directories on the data volume are not read. The `data` volume is mounted at `/opt/airflow`, the Airflow home, in every container and keeps Airflow's logs.
 
 ## Changing configuration
 
