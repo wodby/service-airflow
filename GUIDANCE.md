@@ -4,7 +4,7 @@ What Wodby sets up for Airflow on this service. It runs the official `apache/air
 
 ## Processes
 
-One pod runs four containers on the same volume: the API server (main container, port 8080, also the web interface), `scheduler`, `dag-processor` and `triggerer`. Before they start, an init container migrates the metadata database (`_AIRFLOW_DB_MIGRATE`) and creates the administrator (`_AIRFLOW_WWW_USER_CREATE`). The executor is `LocalExecutor`: tasks run inside the scheduler container. The service is not scalable.
+One pod runs four containers on the same volume: the API server (main container, port 8080, also the web interface), `scheduler`, `dag-processor` and `triggerer`. Before they start, an init container migrates the metadata database (`_AIRFLOW_DB_MIGRATE`) and creates the administrator (`_AIRFLOW_WWW_USER_CREATE`). The executor is `LocalExecutor`: tasks run inside the scheduler container, so their memory comes from that container's limit, which is set with the other containers' resources on the app service. Airflow itself doesn't cap a task's memory; `AIRFLOW__CORE__PARALLELISM` and DAG-level `max_active_tasks` limit how many tasks run at once. The service is not scalable.
 
 ## Linked services
 
@@ -33,13 +33,13 @@ The image is built from the app's Git repository on top of the `apache/airflow` 
 - installs the packages in `requirements.txt`, when the repository has one, with Airflow pinned to the image's version, so packages that need another Airflow fail the build;
 - sets `AIRFLOW__CORE__DAGS_FOLDER` to `/opt/airflow-app/dags` and `AIRFLOW__CORE__PLUGINS_FOLDER` to `/opt/airflow-app/plugins`.
 
-Every Airflow component runs the built image: the API server, and the setup step, scheduler, DAG processor and triggerer, which the service's `helm.image.references` point at the same image. DAG and package changes reach Airflow with the next deployment. Airflow's version comes from the service version and the image, not from the repository.
+Every Airflow component runs the built image: the API server, scheduler, DAG processor and triggerer are build containers of the workload, and the setup step gets the image through `helm.image.references`. DAG and package changes reach Airflow with the next deployment. Airflow's version comes from the service version and the image, not from the repository.
 
 Put DAG files in `dags/` and plugins in `plugins/` of the repository; the `dags` and `plugins` directories on the data volume are not read. The `data` volume is mounted at `/opt/airflow`, the Airflow home, in every container and keeps Airflow's logs.
 
 ## Changing configuration
 
-Add or change `AIRFLOW__*` environment variables on the service and deploy it. The scheduler, DAG processor and triggerer are separate containers with their own variables declared in the manifest; after a change, check that it reached the container that uses it.
+Add or change `AIRFLOW__*` environment variables on the service and deploy it. The scheduler, DAG processor and triggerer get only the service's secret variables, from the environment Secret, plus the executor, examples and auth manager settings declared in the manifest; after a change, check that it reached the container that uses it.
 
 ## Check the result
 
