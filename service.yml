@@ -173,83 +173,67 @@ helm:
           memory: 256Mi
         limits:
           memory: 1Gi
-  - name: extraContainers
+  # The scheduler, DAG processor and triggerer run next to the API server as named
+  # containers, so each one has its own resources on the app service. Tasks run
+  # inside the scheduler (LocalExecutor). Like the setup step, they get the
+  # service's secret variables, which include the database connection.
+  - name: additionalContainers.scheduler.args
     value:
-    - name: scheduler
-      image: apache/airflow:3.3.2
-      imagePullPolicy: IfNotPresent
-      args:
-      - scheduler
-      env:
-      - name: AIRFLOW__CORE__EXECUTOR
-        value: LocalExecutor
-      - name: AIRFLOW__CORE__LOAD_EXAMPLES
-        value: 'False'
-      - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: 
-          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      envFrom:
-      - secretRef:
-          name: '{{service.secrets.env}}'
-      volumeMounts:
-      - name: data
-        mountPath: /opt/airflow
-      resources:
-        requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          memory: 2Gi
-    - name: dag-processor
-      image: apache/airflow:3.3.2
-      imagePullPolicy: IfNotPresent
-      args:
-      - dag-processor
-      env:
-      - name: AIRFLOW__CORE__EXECUTOR
-        value: LocalExecutor
-      - name: AIRFLOW__CORE__LOAD_EXAMPLES
-        value: 'False'
-      - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: 
-          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      envFrom:
-      - secretRef:
-          name: '{{service.secrets.env}}'
-      volumeMounts:
-      - name: data
-        mountPath: /opt/airflow
-      resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-        limits:
-          memory: 1Gi
-    - name: triggerer
-      image: apache/airflow:3.3.2
-      imagePullPolicy: IfNotPresent
-      args:
-      - triggerer
-      env:
-      - name: AIRFLOW__CORE__EXECUTOR
-        value: LocalExecutor
-      - name: AIRFLOW__CORE__LOAD_EXAMPLES
-        value: 'False'
-      - name: AIRFLOW__CORE__AUTH_MANAGER
-        value: 
-          airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      envFrom:
-      - secretRef:
-          name: '{{service.secrets.env}}'
-      volumeMounts:
-      - name: data
-        mountPath: /opt/airflow
-      resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-        limits:
-          memory: 1Gi
+    - scheduler
+  - name: additionalContainers.scheduler.extraVolumeMounts
+    value:
+    - name: data
+      mountPath: /opt/airflow
+  - name: additionalContainers.scheduler.envVars
+    value:
+    - name: AIRFLOW__CORE__EXECUTOR
+      value: LocalExecutor
+    - name: AIRFLOW__CORE__LOAD_EXAMPLES
+      value: 'False'
+    - name: AIRFLOW__CORE__AUTH_MANAGER
+      value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  - name: additionalContainers.scheduler.envFrom
+    value:
+    - secretRef:
+        name: '{{service.secrets.env}}'
+  - name: additionalContainers.dag-processor.args
+    value:
+    - dag-processor
+  - name: additionalContainers.dag-processor.extraVolumeMounts
+    value:
+    - name: data
+      mountPath: /opt/airflow
+  - name: additionalContainers.dag-processor.envVars
+    value:
+    - name: AIRFLOW__CORE__EXECUTOR
+      value: LocalExecutor
+    - name: AIRFLOW__CORE__LOAD_EXAMPLES
+      value: 'False'
+    - name: AIRFLOW__CORE__AUTH_MANAGER
+      value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  - name: additionalContainers.dag-processor.envFrom
+    value:
+    - secretRef:
+        name: '{{service.secrets.env}}'
+  - name: additionalContainers.triggerer.args
+    value:
+    - triggerer
+  - name: additionalContainers.triggerer.extraVolumeMounts
+    value:
+    - name: data
+      mountPath: /opt/airflow
+  - name: additionalContainers.triggerer.envVars
+    value:
+    - name: AIRFLOW__CORE__EXECUTOR
+      value: LocalExecutor
+    - name: AIRFLOW__CORE__LOAD_EXAMPLES
+      value: 'False'
+    - name: AIRFLOW__CORE__AUTH_MANAGER
+      value: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  - name: additionalContainers.triggerer.envFrom
+    value:
+    - secretRef:
+        name: '{{service.secrets.env}}'
   - name: startupProbe
     value:
       httpGet:
@@ -296,11 +280,59 @@ workloads:
       env: envVars
       mounts: extraVolumeMounts
       image:
-        # The setup step, scheduler, DAG processor and triggerer run the built
-        # image too, so every Airflow component has the project's DAGs and
-        # packages.
+        # The setup step runs the built image too, so it migrates the database
+        # with the project's packages installed.
         references:
         - initContainers[0].image
-        - extraContainers[0].image
-        - extraContainers[1].image
-        - extraContainers[2].image
+  # Schedules DAG runs and runs their tasks (LocalExecutor), so task memory
+  # comes from this container.
+  - name: scheduler
+    image: apache/airflow
+    build: true
+    resources:
+      request:
+        cpu: 250
+        memory: 512
+      limit:
+        memory: 2048
+    helm:
+      resources: additionalContainers.scheduler.resources
+      image:
+        repository: additionalContainers.scheduler.image.repository
+        tag: additionalContainers.scheduler.image.tag
+        registry: additionalContainers.scheduler.image.registry
+        pullPolicy: additionalContainers.scheduler.image.pullPolicy
+  # Parses the DAG files.
+  - name: dag-processor
+    image: apache/airflow
+    build: true
+    resources:
+      request:
+        cpu: 100
+        memory: 256
+      limit:
+        memory: 1024
+    helm:
+      resources: additionalContainers.dag-processor.resources
+      image:
+        repository: additionalContainers.dag-processor.image.repository
+        tag: additionalContainers.dag-processor.image.tag
+        registry: additionalContainers.dag-processor.image.registry
+        pullPolicy: additionalContainers.dag-processor.image.pullPolicy
+  # Runs deferred tasks.
+  - name: triggerer
+    image: apache/airflow
+    build: true
+    resources:
+      request:
+        cpu: 100
+        memory: 256
+      limit:
+        memory: 1024
+    helm:
+      resources: additionalContainers.triggerer.resources
+      image:
+        repository: additionalContainers.triggerer.image.repository
+        tag: additionalContainers.triggerer.image.tag
+        registry: additionalContainers.triggerer.image.registry
+        pullPolicy: additionalContainers.triggerer.image.pullPolicy
